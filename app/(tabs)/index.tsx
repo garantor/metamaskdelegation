@@ -1,75 +1,129 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Button } from 'react-native';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { GetUserPasskeyAssertion, RegisterNewPasskeyWithPRF } from '@/Blockchain/passkeys';
+import React from 'react';
+import { ChainKeys, decryptWithPRF, GenerateBlockchainKeyFromMnemonic, generateEncryptedHexMnemonic } from '@/Blockchain/utils';
+import { ColoredLabel } from '@/components/ColoredLabel';
+
+
+// Demo showing passkey registration and PRF-based key generation
+// In a real app, handle errors, loading states, and secure storage appropriately
+// Also, ensure your backend supports WebAuthn with the PRF extension
+// and provides necessary challenges and verifies assertions
+// This is a simplified example for demonstration purposes only
+// Make sure to store the encrypted mnemonic securely on your backend
+// and never expose sensitive data in the frontend or console logs sensitive data
+// For signing of user transactions/operations decryption of the mnemonic should be done on the client side and private keys should never leave the client device
 
 export default function HomeScreen() {
+  const backendSalt = React.useRef('some-random-backend-salt'); // In real app, fetch from backend
+  const [isRegSuccessful, setIsRegSuccessful] = React.useState(false);
+  const [displayText, setDisplayText] = React.useState<ChainKeys | string>('Register Passkey');
+
+  const getBorderColor = (key: string) => {
+    switch (key) {
+      case 'stellar': return '#08b5e5';
+      case 'xrpl': return '#e6c300';
+      case 'solana': return '#9945FF';
+      case 'evm': return '#29b6af';
+      default: return 'gray';
+    }
+  };
+
+  async function handleGeneratePRFKey() {
+    try {
+      // Get user assertion with PRF
+      let assertion = await GetUserPasskeyAssertion(backendSalt.current);
+
+      // Convert ArrayBuffer to Uint8Array
+      if (assertion) {
+
+        // Convert ArrayBuffer to Uint8Array
+        let keyArray: Uint8Array;
+        if (assertion instanceof ArrayBuffer) {
+          keyArray = new Uint8Array(assertion);
+        } else if (assertion instanceof Uint8Array) {
+          keyArray = assertion;
+        } else {
+          throw new Error('Invalid PRF key format. Expected ArrayBuffer or Uint8Array.');
+        }
+
+
+        if (keyArray.length !== 32) {
+          throw new Error(`Expected 32-byte key, got ${keyArray.length} bytes`);
+        }
+
+        const encryptedStrings = await generateEncryptedHexMnemonic(keyArray);
+        try {
+          const decryptedMnemonic = await decryptWithPRF(encryptedStrings, keyArray);
+
+          let addresses: any = await GenerateBlockchainKeyFromMnemonic(decryptedMnemonic.mnemonic.phrase);
+          setDisplayText(addresses)
+
+          // store user wallet in local storage
+
+
+          // setUserAddresses(addressList as Record<string, string>);
+        } catch (error) {
+          console.error('Error loading addresses after registration:', error);
+        } finally {
+          // setLoadingAddresses(false);
+        }
+
+        window.alert('Blockchain wallet created and addresses loaded successfully!');
+      }
+    } catch (error: any) {
+      window.alert('Error during blockchain registration: ' + error.message);
+      // setLoadingAddresses(false);
+    }
+  }
+
+
+  async function handlePasskeyRegistration() {
+    let calling = await RegisterNewPasskeyWithPRF()
+    setTimeout(async () => {
+
+      await handleGeneratePRFKey();
+      setIsRegSuccessful(true);
+    }, 1000);
+
+
+
+
+  }
+
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
+
+    <ThemedView style={{ flex: 1, alignContent: 'center', justifyContent: 'center', padding: 16 }}>
+      <ThemedText style={{ textAlign: 'center' }}>Hellow</ThemedText>
+      <ThemedView style={{ flex: 1, alignContent: 'center', justifyContent: 'center', padding: 16 }}>
+        <Button title='Hellow' onPress={handlePasskeyRegistration} />
+
+        <ThemedView style={{ marginTop: 16, padding: 16, borderWidth: 1, borderColor: '#ccc', borderRadius: 8 }}>
+
+          {isRegSuccessful && Object.entries(displayText).map(([key, value]) => (
+            <ColoredLabel
+              key={key}
+              // Render the key in bold and value normal
+              text={
+                <ThemedText>
+                  <ThemedText style={{ fontWeight: 'bold', textAlign: 'center' }}>{key.toUpperCase()}:</ThemedText> {String(value)}
+                </ThemedText>
+              }
+              borderColor={getBorderColor(key)}
+              style={{ marginBottom: 4, opacity: isRegSuccessful ? 1 : 0.5 }}
+            />
+          ))}
+
+        </ThemedView>
+
+
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    </ThemedView>
+
   );
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
