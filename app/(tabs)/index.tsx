@@ -16,6 +16,7 @@ import { ColoredLabel } from '@/components/ColoredLabel';
 // Make sure to store the encrypted mnemonic securely on your backend
 // and never expose sensitive data in the frontend or console logs sensitive data
 // For signing of user transactions/operations decryption of the mnemonic should be done on the client side and private keys should never leave the client device
+// this demo does not include user login flow, the process is straightforward.
 
 export default function HomeScreen() {
   const backendSalt = React.useRef('some-random-backend-salt'); // In real app, fetch from backend
